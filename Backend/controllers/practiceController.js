@@ -3,11 +3,17 @@ const db = require("../config/db.js");
 // ─── POST /api/practice — Upload practice work (Learner only) ─────────────────
 exports.createPractice = async (req, res) => {
   try {
-    const { title, description, image_url } = req.body;
+    const { title, description } = req.body;
     const learnerId = req.user.id;
 
+    // Accept a real uploaded file OR a URL passed in the body (backward compat)
+    let image_url = req.body.image_url || null;
+    if (req.file) {
+      image_url = `/uploads/practice/${req.file.filename}`;
+    }
+
     if (!title || !image_url) {
-      return res.status(400).json({ message: "Title and image_url are required." });
+      return res.status(400).json({ message: "Title and an image file are required." });
     }
 
     const [result] = await db.query(
@@ -24,6 +30,7 @@ exports.createPractice = async (req, res) => {
     res.status(500).json({ message: "Server error." });
   }
 };
+
 
 // ─── GET /api/practice — Get my practice works (Learner only) ─────────────────
 exports.getMyPractice = async (req, res) => {
@@ -93,9 +100,9 @@ exports.updatePractice = async (req, res) => {
     const fields = [];
     const values = [];
 
-    if (title)       { fields.push("title = ?");       values.push(title); }
+    if (title) { fields.push("title = ?"); values.push(title); }
     if (description) { fields.push("description = ?"); values.push(description); }
-    if (image_url)   { fields.push("image_url = ?");   values.push(image_url); }
+    if (image_url) { fields.push("image_url = ?"); values.push(image_url); }
 
     if (fields.length === 0) {
       return res.status(400).json({ message: "No fields provided to update." });

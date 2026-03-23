@@ -3,11 +3,17 @@ const db = require("../config/db.js");
 // ─── POST /api/artworks — Upload artwork (Guide only) ──────────────────────────
 exports.createArtwork = async (req, res) => {
   try {
-    const { title, description, image_url, category } = req.body;
+    const { title, description, category } = req.body;
     const guideId = req.user.id;
 
+    // Accept a real uploaded file OR a URL passed in the body (backward compat)
+    let image_url = req.body.image_url || null;
+    if (req.file) {
+      image_url = `/uploads/artworks/${req.file.filename}`;
+    }
+
     if (!title || !image_url) {
-      return res.status(400).json({ message: "Title and image_url are required." });
+      return res.status(400).json({ message: "Title and an image file are required." });
     }
 
     const [result] = await db.query(
@@ -24,6 +30,7 @@ exports.createArtwork = async (req, res) => {
     res.status(500).json({ message: "Server error." });
   }
 };
+
 
 // ─── GET /api/artworks — Get all artworks (Public) ────────────────────────────
 exports.getAllArtworks = async (req, res) => {
@@ -85,10 +92,10 @@ exports.updateArtwork = async (req, res) => {
     const fields = [];
     const values = [];
 
-    if (title)       { fields.push("title = ?");       values.push(title); }
+    if (title) { fields.push("title = ?"); values.push(title); }
     if (description) { fields.push("description = ?"); values.push(description); }
-    if (image_url)   { fields.push("image_url = ?");   values.push(image_url); }
-    if (category)    { fields.push("category = ?");    values.push(category); }
+    if (image_url) { fields.push("image_url = ?"); values.push(image_url); }
+    if (category) { fields.push("category = ?"); values.push(category); }
 
     if (fields.length === 0) {
       return res.status(400).json({ message: "No fields provided to update." });

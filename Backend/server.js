@@ -1,16 +1,17 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const path = require("path");
 const cookieParser = require("cookie-parser");
 const passport = require("./config/passport.js");
 
 dotenv.config();
 
-const authRoutes     = require("./routes/authRoutes.js");
-const adminRoutes    = require("./routes/adminRoutes.js");
-const artworkRoutes  = require("./routes/artworkRoutes.js");
+const authRoutes = require("./routes/authRoutes.js");
+const adminRoutes = require("./routes/adminRoutes.js");
+const artworkRoutes = require("./routes/artworkRoutes.js");
 const practiceRoutes = require("./routes/practiceRoutes.js");
-const { verifyToken }    = require("./middleware/authMiddleware.js");
+const { verifyToken } = require("./middleware/authMiddleware.js");
 const { authorizeRoles } = require("./middleware/roleMiddleware.js");
 
 const app = express();
@@ -24,9 +25,12 @@ app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(passport.initialize());
 
+// ── Static file serving for uploads ────────────────────────────────────────
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use("/api/auth",     authRoutes);
-app.use("/api/admin",   adminRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/artworks", artworkRoutes);
 app.use("/api/practice", practiceRoutes);
 

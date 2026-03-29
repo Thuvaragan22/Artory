@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS artworks (
   description TEXT          NULL,
   image_url   VARCHAR(500)  NOT NULL,
   category    VARCHAR(100)  NULL,
+  is_for_sale BOOLEAN       NOT NULL DEFAULT FALSE,
+  price       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_artwork_guide FOREIGN KEY (guide_id) REFERENCES users(id) ON DELETE CASCADE
@@ -66,7 +68,72 @@ CREATE TABLE IF NOT EXISTS practice_works (
 CREATE INDEX idx_practice_learner_id ON practice_works(learner_id);
 
 -- ============================================================
--- Sample admin user (password: Admin@1234)
+-- Courses table
 -- ============================================================
--- INSERT INTO users (username, email, password, role, is_verified)
--- VALUES ('Admin', 'admin@artplatform.com', '$2a$12$...hashedpassword...', 'admin', true);
+CREATE TABLE IF NOT EXISTS courses (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  guide_id      INT           NOT NULL,
+  title         VARCHAR(255)  NOT NULL,
+  description   TEXT          NULL,
+  price         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  level         ENUM('Beginner', 'Intermediate', 'Advanced') DEFAULT 'Beginner',
+  thumbnail_url VARCHAR(500)  NULL,
+  methods_doc_url VARCHAR(500) NULL,
+  created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_course_guide FOREIGN KEY (guide_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_courses_guide_id ON courses(guide_id);
+
+-- ============================================================
+-- Orders table (for artwork or course)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS orders (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  learner_id    INT           NOT NULL,
+  artwork_id    INT           NULL,
+  course_id     INT           NULL,
+  status        ENUM('pending', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
+  amount        DECIMAL(10,2) NOT NULL,
+  created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_order_learner FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_artwork FOREIGN KEY (artwork_id) REFERENCES artworks(id) ON DELETE SET NULL,
+  CONSTRAINT fk_order_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_orders_learner_id ON orders(learner_id);
+
+-- ============================================================
+-- Payments table
+-- ============================================================
+CREATE TABLE IF NOT EXISTS payments (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  order_id      INT           NOT NULL,
+  amount        DECIMAL(10,2) NOT NULL,
+  payment_method VARCHAR(100)  NULL,
+  status        ENUM('pending', 'success', 'failed') NOT NULL DEFAULT 'pending',
+  transaction_id VARCHAR(255)  NULL,
+  created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_payments_order_id ON payments(order_id);
+
+-- ============================================================
+-- Course Enrollments/Requests
+-- ============================================================
+CREATE TABLE IF NOT EXISTS course_enrollments (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  course_id     INT           NOT NULL,
+  learner_id    INT           NOT NULL,
+  status        ENUM('requested', 'approved', 'rejected') NOT NULL DEFAULT 'requested',
+  created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_enrollment_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+  CONSTRAINT fk_enrollment_learner FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_enroll_course_id ON course_enrollments(course_id);
+CREATE INDEX idx_enroll_learner_id ON course_enrollments(learner_id);

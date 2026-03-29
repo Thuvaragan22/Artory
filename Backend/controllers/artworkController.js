@@ -3,7 +3,7 @@ const db = require("../config/db.js");
 // ─── POST /api/artworks — Upload artwork (Guide only) ──────────────────────────
 exports.createArtwork = async (req, res) => {
   try {
-    const { title, description, category } = req.body;
+    const { title, description, category, is_for_sale, price } = req.body;
     const guideId = req.user.id;
 
     // Accept a real uploaded file OR a URL passed in the body (backward compat)
@@ -17,9 +17,9 @@ exports.createArtwork = async (req, res) => {
     }
 
     const [result] = await db.query(
-      `INSERT INTO artworks (guide_id, title, description, image_url, category, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      [guideId, title, description || null, image_url, category || null]
+      `INSERT INTO artworks (guide_id, title, description, image_url, category, is_for_sale, price, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [guideId, title, description || null, image_url, category || null, is_for_sale || false, price || 0]
     );
 
     const [artwork] = await db.query("SELECT * FROM artworks WHERE id = ?", [result.insertId]);
@@ -96,6 +96,8 @@ exports.updateArtwork = async (req, res) => {
     if (description) { fields.push("description = ?"); values.push(description); }
     if (image_url) { fields.push("image_url = ?"); values.push(image_url); }
     if (category) { fields.push("category = ?"); values.push(category); }
+    if (is_for_sale !== undefined) { fields.push("is_for_sale = ?"); values.push(is_for_sale); }
+    if (price !== undefined) { fields.push("price = ?"); values.push(price); }
 
     if (fields.length === 0) {
       return res.status(400).json({ message: "No fields provided to update." });

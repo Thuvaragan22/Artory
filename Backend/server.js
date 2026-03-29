@@ -11,6 +11,9 @@ const authRoutes = require("./routes/authRoutes.js");
 const adminRoutes = require("./routes/adminRoutes.js");
 const artworkRoutes = require("./routes/artworkRoutes.js");
 const practiceRoutes = require("./routes/practiceRoutes.js");
+const courseRoutes = require("./routes/courseRoutes.js");
+const orderRoutes = require("./routes/orderRoutes.js");
+const paymentRoutes = require("./routes/paymentRoutes.js");
 const { verifyToken } = require("./middleware/authMiddleware.js");
 const { authorizeRoles } = require("./middleware/roleMiddleware.js");
 
@@ -33,6 +36,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/artworks", artworkRoutes);
 app.use("/api/practice", practiceRoutes);
+app.use("/api/courses", courseRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // ── Role Dashboards ───────────────────────────────────────────────────────────
 app.get("/api/admin/dashboard",

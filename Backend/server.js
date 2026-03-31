@@ -14,6 +14,8 @@ const practiceRoutes = require("./routes/practiceRoutes.js");
 const courseRoutes = require("./routes/courseRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
 const paymentRoutes = require("./routes/paymentRoutes.js");
+const userRoutes = require("./routes/userRoutes.js");
+
 const { verifyToken } = require("./middleware/authMiddleware.js");
 const { authorizeRoles } = require("./middleware/roleMiddleware.js");
 
@@ -39,6 +41,20 @@ app.use("/api/practice", practiceRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/users", userRoutes);
+
+app.get("/api/debug-db", async (req, res) => {
+  try {
+    const db = require("./config/db.js");
+    const [cols] = await db.query("DESC artworks");
+    const [tables] = await db.query("SHOW TABLES");
+    res.json({ tables: tables.map(t => Object.values(t)[0]), columns: cols });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 
 // ── Role Dashboards ───────────────────────────────────────────────────────────
 app.get("/api/admin/dashboard",

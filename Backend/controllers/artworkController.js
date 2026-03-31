@@ -16,10 +16,14 @@ exports.createArtwork = async (req, res) => {
       return res.status(400).json({ message: "Title and an image file are required." });
     }
 
+    console.log("Creating artwork with body:", req.body);
+    const isForSaleBool = is_for_sale === 'true' || is_for_sale === true;
+    const priceNum = parseFloat(price) || 0;
+
     const [result] = await db.query(
       `INSERT INTO artworks (guide_id, title, description, image_url, category, is_for_sale, price, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [guideId, title, description || null, image_url, category || null, is_for_sale || false, price || 0]
+      [guideId, title, description || null, image_url, category || null, isForSaleBool, priceNum]
     );
 
     const [artwork] = await db.query("SELECT * FROM artworks WHERE id = ?", [result.insertId]);
@@ -75,7 +79,7 @@ exports.getArtworkById = async (req, res) => {
 exports.updateArtwork = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, image_url, category } = req.body;
+    const { title, description, image_url, category, is_for_sale, price } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 

@@ -49,6 +49,7 @@ exports.register = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        profile_image_url: user.profile_image_url,
       },
     });
   } catch (error) {
@@ -98,6 +99,7 @@ exports.login = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        profile_image_url: user.profile_image_url,
       },
     });
   } catch (error) {
@@ -237,7 +239,7 @@ exports.googleCallback = (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const [users] = await db.query(
-      "SELECT id, username, email, role, is_verified, created_at FROM users WHERE id = ?",
+      "SELECT id, username, email, role, profile_image_url, is_verified, created_at FROM users WHERE id = ?",
       [req.user.id]
     );
 

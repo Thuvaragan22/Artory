@@ -15,6 +15,10 @@ const courseRoutes = require("./routes/courseRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
 const paymentRoutes = require("./routes/paymentRoutes.js");
 const userRoutes = require("./routes/userRoutes.js");
+const subscriptionRoutes = require("./routes/subscriptionRoutes.js");
+const socialRoutes = require("./routes/socialRoutes.js");
+const notificationRoutes = require("./routes/notificationRoutes.js");
+const searchRoutes = require("./routes/searchRoutes.js");
 
 const { verifyToken } = require("./middleware/authMiddleware.js");
 const { authorizeRoles } = require("./middleware/roleMiddleware.js");
@@ -42,13 +46,16 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/social", socialRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/search", searchRoutes);
 
-app.get("/api/debug-db", async (req, res) => {
+app.get("/api/debug-users", async (req, res) => {
   try {
     const db = require("./config/db.js");
-    const [cols] = await db.query("DESC artworks");
-    const [tables] = await db.query("SHOW TABLES");
-    res.json({ tables: tables.map(t => Object.values(t)[0]), columns: cols });
+    const [users] = await db.query("SELECT id, username, profile_image_url, role FROM users");
+    res.json({ users });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

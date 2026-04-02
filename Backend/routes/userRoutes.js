@@ -17,7 +17,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// All routes require authentication
+router.get("/guides", userController.getGuides);
+router.get("/public-profile/:id", userController.getPublicProfile);
+
+// All routes below require authentication
 router.use(verifyToken);
 
 router.get("/profile", userController.getProfile);

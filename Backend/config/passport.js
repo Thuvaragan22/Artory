@@ -15,9 +15,11 @@ exports.initPassport = () => {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: process.env.GOOGLE_CALLBACK_URL,
+        passReqToCallback: true,
       },
-      async (accessToken, refreshToken, profile, done) => {
+      async (req, accessToken, refreshToken, profile, done) => {
         try {
+          const role = req.query.state || "learner"; // Get role from state
           const email = profile.emails[0].value;
           const username = profile.displayName;
           const googleId = profile.id;
@@ -35,10 +37,8 @@ exports.initPassport = () => {
 
           const [result] = await db.query(
             "INSERT INTO users (username, email, google_id, role, is_verified) VALUES (?, ?, ?, ?, ?)",
-            [username, email, googleId, "learner", true]
+            [username, email, googleId, role, true]
           );
-
-          const [newUser] = await db.query("SELECT * FROM users WHERE id = ?", [result.insertId]);
           return done(null, newUser[0]);
         } catch (error) {
           return done(error, null);

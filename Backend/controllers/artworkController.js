@@ -40,7 +40,8 @@ exports.createArtwork = async (req, res) => {
 exports.getAllArtworks = async (req, res) => {
   try {
     const [artworks] = await db.query(
-      `SELECT a.*, u.username AS guide_name
+      `SELECT a.*, u.username AS guide_name, u.profile_image_url AS guide_profile_image_url,
+              (SELECT COUNT(*) FROM likes WHERE artwork_id = a.id) as likes_count
        FROM artworks a
        JOIN users u ON u.id = a.guide_id
        ORDER BY a.created_at DESC`
@@ -57,7 +58,8 @@ exports.getArtworkById = async (req, res) => {
   try {
     const { id } = req.params;
     const [artworks] = await db.query(
-      `SELECT a.*, u.username AS guide_name
+      `SELECT a.*, u.username AS guide_name, u.profile_image_url AS guide_profile_image_url,
+              (SELECT COUNT(*) FROM likes WHERE artwork_id = a.id) as likes_count
        FROM artworks a
        JOIN users u ON u.id = a.guide_id
        WHERE a.id = ?`,

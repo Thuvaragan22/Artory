@@ -1,4 +1,5 @@
 const db = require('../config/db.js');
+const emailService = require('../services/emailService');
 
 // ─── POST /api/courses — Create Course (Guide only) ───────────────────────────
 exports.createCourse = async (req, res) => {
@@ -41,7 +42,8 @@ exports.createCourse = async (req, res) => {
 exports.getAllCourses = async (req, res) => {
     try {
         const [courses] = await db.query(
-            `SELECT c.*, u.username AS guide_name
+            `SELECT c.*, u.username AS guide_name, u.profile_image_url AS guide_profile_image_url,
+                    (SELECT COUNT(*) FROM course_enrollments WHERE course_id = c.id AND status = 'approved') as student_count
              FROM courses c
              JOIN users u ON u.id = c.guide_id
              ORDER BY c.created_at DESC`
@@ -58,7 +60,8 @@ exports.getCourseById = async (req, res) => {
     try {
         const { id } = req.params;
         const [courses] = await db.query(
-            `SELECT c.*, u.username AS guide_name
+            `SELECT c.*, u.username AS guide_name, u.profile_image_url AS guide_profile_image_url,
+                    (SELECT COUNT(*) FROM course_enrollments WHERE course_id = c.id AND status = 'approved') as student_count
              FROM courses c
              JOIN users u ON u.id = c.guide_id
              WHERE c.id = ?`,
@@ -142,6 +145,27 @@ exports.enrollCourse = async (req, res) => {
             [courseId, learnerId]
         );
 
+        // Send email notification to the guide (fire-and-forget)
+        try {
+            const [learnerRows] = await db.query("SELECT username, email FROM users WHERE id = ?", [learnerId]);
+            const [guideRows] = await db.query("SELECT username, email FROM users WHERE id = ?", [course[0].guide_id]);
+            if (learnerRows.length > 0 && guideRows.length > 0) {
+                const learner = learnerRows[0];
+                const guide = guideRows[0];
+                const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+                emailService.sendEnrollmentRequestEmail({
+                    guideEmail: guide.email,
+                    guideName: guide.username,
+                    learnerName: learner.username,
+                    learnerEmail: learner.email,
+                    courseTitle: course[0].title,
+                    dashboardLink: `${clientUrl}/guide/dashboard`,
+                }).catch(err => console.error('Guide email send failed:', err));
+            }
+        } catch (emailErr) {
+            console.error('Email preparation error:', emailErr);
+        }
+
         res.status(201).json({ message: "Enrollment request sent. Waiting for guide approval." });
     } catch (error) {
         console.error("Enroll course error:", error);
@@ -213,6 +237,27 @@ exports.updateEnrollmentStatus = async (req, res) => {
             "UPDATE course_enrollments SET status = ?, updated_at = NOW() WHERE id = ?",
             [status, enrollmentId]
         );
+
+        // Send approval email to the learner (fire-and-forget)
+        if (status === 'approved') {
+            try {
+                const [learnerRows] = await db.query("SELECT username, email FROM users WHERE id = ?", [enrollment[0].learner_id]);
+                const [guideRows] = await db.query("SELECT username FROM users WHERE id = ?", [userId]);
+                const [courseRows] = await db.query("SELECT title FROM courses WHERE id = ?", [enrollment[0].course_id]);
+                if (learnerRows.length > 0 && courseRows.length > 0) {
+                    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+                    emailService.sendEnrollmentApprovalEmail({
+                        learnerEmail: learnerRows[0].email,
+                        learnerName: learnerRows[0].username,
+                        courseTitle: courseRows[0].title,
+                        guideName: guideRows[0]?.username || 'your guide',
+                        dashboardLink: `${clientUrl}/learner/dashboard`,
+                    }).catch(err => console.error('Learner approval email send failed:', err));
+                }
+            } catch (emailErr) {
+                console.error('Approval email preparation error:', emailErr);
+            }
+        }
 
         res.status(200).json({ message: `Enrollment ${status}.` });
     } catch (error) {

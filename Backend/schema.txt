@@ -1,0 +1,17 @@
+Field	Type	Null	Key	Default	Extra
+id	int	NO	PRI	NULL	auto_increment
+course_id	int	NO	MUL	NULL	
+learner_id	int	NO	MUL	NULL	
+status	enum('requested','approved','rejected')	NO		requested	
+created_at	datetime	NO		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+updated_at	datetime	NO		CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+full_name	varchar(255)	YES		NULL	
+email	varchar(255)	YES		NULL	
+dob	date	YES		NULL	
+country_code	varchar(10)	YES		NULL	
+phone	varchar(50)	YES		NULL	
+country	varchar(100)	YES		NULL	
+city	varchar(100)	YES		NULL	
+age_dob	varchar(100)	YES		NULL	
+gender	varchar(20)	YES		NULL	
+location	varchar(255)	YES		NULL	

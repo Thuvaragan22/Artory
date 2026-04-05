@@ -139,10 +139,12 @@ exports.enrollCourse = async (req, res) => {
             return res.status(400).json({ message: "Already enrolled or requested." });
         }
 
+        const { full_name, email, country_code, phone_number, dob, age, gender, country, city } = req.body;
+
         await db.query(
-            `INSERT INTO course_enrollments (course_id, learner_id, status, created_at, updated_at)
-             VALUES (?, ?, 'requested', NOW(), NOW())`,
-            [courseId, learnerId]
+            `INSERT INTO course_enrollments (course_id, learner_id, full_name, email, country_code, phone_number, dob, age, gender, country, city, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', NOW(), NOW())`,
+            [courseId, learnerId, full_name || null, email || null, country_code || null, phone_number || null, dob || null, age || null, gender || null, country || null, city || null]
         );
 
         // Send email notification to the guide (fire-and-forget)
@@ -160,6 +162,7 @@ exports.enrollCourse = async (req, res) => {
                     learnerEmail: learner.email,
                     courseTitle: course[0].title,
                     dashboardLink: `${clientUrl}/guide/dashboard`,
+                    details: { full_name, email, country_code, phone_number, dob, age, gender, country, city }
                 }).catch(err => console.error('Guide email send failed:', err));
             }
         } catch (emailErr) {
@@ -183,7 +186,7 @@ exports.getEnrollments = async (req, res) => {
         let params = [];
 
         if (role === 'guide') {
-            query = `SELECT ce.*, c.title AS course_title, u.username AS learner_name, u.email AS learner_email
+            query = `SELECT ce.*, c.title AS course_title, u.username AS learner_name, u.email AS learner_user_email
                      FROM course_enrollments ce
                      JOIN courses c ON c.id = ce.course_id
                      JOIN users u ON u.id = ce.learner_id

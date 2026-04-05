@@ -1,20 +1,20 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: false, // TLS
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.EMAIL_PORT) || 587,
+  secure: false, // TLS
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
 /**
  * Send enrollment request email to the guide
  */
-exports.sendEnrollmentRequestEmail = async ({ guideEmail, guideName, learnerName, learnerEmail, courseTitle, dashboardLink }) => {
-    const html = `
+exports.sendEnrollmentRequestEmail = async ({ guideEmail, guideName, learnerName, learnerEmail, courseTitle, dashboardLink, details }) => {
+  const html = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -28,8 +28,8 @@ exports.sendEnrollmentRequestEmail = async ({ guideEmail, guideName, learnerName
         .body { padding: 40px; }
         .body p { color: #555; font-size: 15px; line-height: 1.7; }
         .info-box { background: #faf9f6; border-radius: 16px; padding: 24px; margin: 24px 0; border: 1px solid #eee; }
-        .info-box p { margin: 6px 0; font-size: 14px; }
-        .info-box strong { color: #1d1b17; }
+        .info-box p { margin: 8px 0; font-size: 14px; color: #444; }
+        .info-box strong { color: #1d1b17; min-width: 120px; display: inline-block; }
         .btn { display: inline-block; margin-top: 28px; padding: 14px 32px; background: #f97316; color: #fff; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 15px; }
         .footer { padding: 24px 40px; background: #faf9f6; text-align: center; }
         .footer p { color: #aaa; font-size: 12px; margin: 0; }
@@ -43,11 +43,17 @@ exports.sendEnrollmentRequestEmail = async ({ guideEmail, guideName, learnerName
         </div>
         <div class="body">
           <p>Hi <strong>${guideName}</strong>,</p>
-          <p>A learner has requested to join one of your workshops. Review their request and approve or decline from your dashboard.</p>
+          <p>A learner has submitted a detailed application to join your workshop. Please review their details below:</p>
           <div class="info-box">
-            <p>📚 <strong>Course:</strong> ${courseTitle}</p>
-            <p>👤 <strong>Learner:</strong> ${learnerName}</p>
-            <p>📧 <strong>Email:</strong> ${learnerEmail}</p>
+            <p><strong>Workshop:</strong> ${courseTitle}</p>
+            <hr style="border:0; border-top: 1px solid #eee; margin: 15px 0;" />
+            <p><strong>Full Name:</strong> ${details?.full_name || learnerName}</p>
+            <p><strong>Email:</strong> ${details?.email || learnerEmail}</p>
+            <p><strong>Phone:</strong> ${details?.country_code || ''} ${details?.phone_number || 'N/A'}</p>
+            <p><strong>Age:</strong> ${details?.age || 'N/A'} Years</p>
+            <p><strong>DOB:</strong> ${details?.dob || 'N/A'}</p>
+            <p><strong>Location:</strong> ${details?.city || 'N/A'}, ${details?.country || 'N/A'}</p>
+            ${details?.gender ? `<p><strong>Gender:</strong> ${details.gender}</p>` : ''}
           </div>
           <p>Head to your dashboard to approve or decline this request:</p>
           <a href="${dashboardLink}" class="btn">Go to Dashboard &rarr;</a>
@@ -60,19 +66,19 @@ exports.sendEnrollmentRequestEmail = async ({ guideEmail, guideName, learnerName
     </html>
     `;
 
-    await transporter.sendMail({
-        from: `"Artory Platform" <${process.env.EMAIL_USER}>`,
-        to: guideEmail,
-        subject: `📚 New Enrollment Request: ${courseTitle}`,
-        html,
-    });
+  await transporter.sendMail({
+    from: `"Artory Platform" <${process.env.EMAIL_USER}>`,
+    to: guideEmail,
+    subject: `📚 Enrollment Request: ${courseTitle} from ${details?.full_name || learnerName}`,
+    html,
+  });
 };
 
 /**
  * Send approval confirmation email to the learner
  */
 exports.sendEnrollmentApprovalEmail = async ({ learnerEmail, learnerName, courseTitle, guideName, dashboardLink }) => {
-    const html = `
+  const html = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -119,10 +125,10 @@ exports.sendEnrollmentApprovalEmail = async ({ learnerEmail, learnerName, course
     </html>
     `;
 
-    await transporter.sendMail({
-        from: `"Artory Platform" <${process.env.EMAIL_USER}>`,
-        to: learnerEmail,
-        subject: `✅ You're In! Enrollment Approved – ${courseTitle}`,
-        html,
-    });
+  await transporter.sendMail({
+    from: `"Artory Platform" <${process.env.EMAIL_USER}>`,
+    to: learnerEmail,
+    subject: `✅ You're In! Enrollment Approved – ${courseTitle}`,
+    html,
+  });
 };

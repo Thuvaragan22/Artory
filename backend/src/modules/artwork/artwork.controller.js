@@ -1,0 +1,182 @@
+const db = require("../../config/db.js");
+const fs = require("fs");
+const path = require("path");
+
+// ─── POST /api/artworks — Upload artwork (Guide only) ──────────────────────────
+exports.createArtwork = async (req, res) => {
+  try {
+    const { title, description, category, is_for_sale, price } = req.body;
+    const guideId = req.user.id;
+
+    // Accept a real uploaded file OR a URL passed in the body (backward compat)
+    let image_url = req.body.image_url || null;
+    if (req.file) {
+      image_url = `/uploads/artworks/${req.file.filename}`;
+    }
+
+    if (!title || !image_url) {
+      return res.status(400).json({ message: "Title and an image file are required." });
+    }
+
+    console.log("Creating artwork with body:", req.body);
+    const isForSaleBool = is_for_sale === 'true' || is_for_sale === true;
+    const priceNum = parseFloat(price) || 0;
+
+    const [result] = await db.query(
+      `INSERT INTO artworks (guide_id, title, description, image_url, category, is_for_sale, price, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [guideId, title, description || null, image_url, category || null, isForSaleBool, priceNum]
+    );
+
+    const [artwork] = await db.query("SELECT * FROM artworks WHERE id = ?", [result.insertId]);
+
+    res.status(201).json({ message: "Artwork created.", artwork: artwork[0] });
+  } catch (error) {
+    console.error("Create artwork error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+
+// ─── GET /api/artworks — Get all artworks (Public) ────────────────────────────
+exports.getAllArtworks = async (req, res) => {
+  try {
+    const [artworks] = await db.query(
+      `SELECT a.*, u.username AS guide_name, u.profile_image_url AS guide_profile_image_url,
+              (SELECT COUNT(*) FROM likes WHERE artwork_id = a.id) as likes_count
+       FROM artworks a
+       JOIN users u ON u.id = a.guide_id
+       ORDER BY a.created_at DESC`
+    );
+    res.status(200).json({ message: "List of artworks.", total: artworks.length, artworks });
+  } catch (error) {
+    console.error("Get all artworks error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// ─── GET /api/artworks/:id — Get artwork details (Public) ─────────────────────
+exports.getArtworkById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [artworks] = await db.query(
+      `SELECT a.*, u.username AS guide_name, u.profile_image_url AS guide_profile_image_url,
+              (SELECT COUNT(*) FROM likes WHERE artwork_id = a.id) as likes_count
+       FROM artworks a
+       JOIN users u ON u.id = a.guide_id
+       WHERE a.id = ?`,
+      [id]
+    );
+
+    if (artworks.length === 0) {
+      return res.status(404).json({ message: "Artwork not found." });
+    }
+
+    res.status(200).json({ message: "Artwork details.", artwork: artworks[0] });
+  } catch (error) {
+    console.error("Get artwork by id error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// ─── PUT /api/artworks/:id — Update artwork (Guide/Owner only) ─────────────────
+exports.updateArtwork = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, image_url, category, is_for_sale, price } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    const [existing] = await db.query("SELECT * FROM artworks WHERE id = ?", [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Artwork not found." });
+    }
+
+    // Only the owner guide (or admin) can update
+    if (userRole !== "admin" && String(existing[0].guide_id) !== String(userId)) {
+
+      return res.status(403).json({ message: "Not owner. Cannot update this artwork." });
+    }
+
+    // Handle file upload if present
+    let updated_image_url = image_url;
+    if (req.file) {
+      updated_image_url = `/uploads/artworks/${req.file.filename}`;
+
+      // Delete old file if it exists and is different
+      if (existing[0].image_url && existing[0].image_url !== updated_image_url) {
+        const oldPath = path.join(__dirname, "../../../", existing[0].image_url);
+        if (fs.existsSync(oldPath)) {
+          fs.unlink(oldPath, (err) => {
+            if (err) console.error("Failed to delete old artwork image:", err);
+          });
+        }
+      }
+    }
+
+    const fields = [];
+    const values = [];
+
+    if (title) { fields.push("title = ?"); values.push(title); }
+    if (description) { fields.push("description = ?"); values.push(description); }
+    if (updated_image_url) { fields.push("image_url = ?"); values.push(updated_image_url); }
+    if (category) {
+      fields.push("category = ?"); values.push(category);
+      fields.push("medium = ?"); values.push(category);
+    }
+
+
+    if (is_for_sale !== undefined) {
+      const isForSaleBool = is_for_sale === 'true' || is_for_sale === true;
+      fields.push("is_for_sale = ?");
+      values.push(isForSaleBool);
+    }
+    if (price !== undefined) {
+      const priceNum = parseFloat(price) || 0;
+      fields.push("price = ?");
+      values.push(priceNum);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ message: "No fields provided to update." });
+    }
+
+
+    fields.push("updated_at = NOW()");
+    values.push(id);
+
+    await db.query(`UPDATE artworks SET ${fields.join(", ")} WHERE id = ?`, values);
+
+
+    const [updated] = await db.query("SELECT * FROM artworks WHERE id = ?", [id]);
+    res.status(200).json({ message: "Artwork updated.", artwork: updated[0] });
+  } catch (error) {
+    console.error("DEBUG: Update artwork error:", error);
+    res.status(500).json({ message: "Server error.", error: error.message });
+  }
+};
+
+// ─── DELETE /api/artworks/:id — Delete artwork (Guide/Admin) ──────────────────
+exports.deleteArtwork = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    const [existing] = await db.query("SELECT * FROM artworks WHERE id = ?", [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Artwork not found." });
+    }
+
+    // Guide can only delete their own; admin can delete any
+    if (userRole !== "admin" && existing[0].guide_id !== userId) {
+      return res.status(403).json({ message: "Not owner. Cannot delete this artwork." });
+    }
+
+    await db.query("DELETE FROM artworks WHERE id = ?", [id]);
+    res.status(200).json({ message: "Artwork deleted." });
+  } catch (error) {
+    console.error("Delete artwork error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};

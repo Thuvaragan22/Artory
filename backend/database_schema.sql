@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 INSERT IGNORE INTO subscription_plans (id, name, price, features) VALUES
 (1, 'Free', 0.00, 'Basic access, limited uploads'),
 (2, 'Trial', 0.00, 'One-month full access trial'),
-(3, 'Premium', 29.99, 'Unlimited access and monetization');
+(3, 'Premium', 4.76, 'Unlimited access and monetization');
 
 -- 2. Users Table (Auth and Roles)
 CREATE TABLE IF NOT EXISTS users (

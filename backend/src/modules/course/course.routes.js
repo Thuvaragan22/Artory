@@ -4,6 +4,7 @@ const courseController = require('./course.controller.js');
 const { verifyToken } = require('../../middleware/authMiddleware.js');
 const { authorizeRoles } = require('../../middleware/roleMiddleware.js');
 const { uploadCourseAssets } = require('../../middleware/upload.js');
+const { canCreateCourse, canJoinCourse } = require('../../middleware/planAccess.middleware.js');
 
 // ── Public Routes ─────────────────────────────────────────────────────────────
 router.get('/', courseController.getAllCourses);
@@ -15,9 +16,10 @@ router.use(verifyToken);
 router.get('/enrollments', authorizeRoles('guide', 'learner'), courseController.getEnrollments);
 router.put('/enrollments/:id', authorizeRoles('guide'), courseController.updateEnrollmentStatus);
 
-router.post('/', authorizeRoles('guide'), uploadCourseAssets, courseController.createCourse);
+router.post('/', authorizeRoles('guide'), canCreateCourse, uploadCourseAssets, courseController.createCourse);
 router.put('/:id', authorizeRoles('guide'), uploadCourseAssets, courseController.updateCourse);
-router.post('/:id/enroll', authorizeRoles('learner'), courseController.enrollCourse);
+router.delete('/:id', authorizeRoles('guide', 'admin'), courseController.deleteCourse);
+router.post('/:id/enroll', authorizeRoles('learner'), canJoinCourse, courseController.enrollCourse);
 
 router.get('/:id', courseController.getCourseById);
 

@@ -1,7 +1,5 @@
 const db = require('../../config/db.js');
 const emailService = require('../../services/emailService');
-const fs = require('fs');
-const path = require('path');
 
 // ─── POST /api/courses — Create Course (Guide only) ───────────────────────────
 exports.createCourse = async (req, res) => {
@@ -14,10 +12,10 @@ exports.createCourse = async (req, res) => {
 
         if (req.files) {
             if (req.files.thumbnail) {
-                thumbnail_url = `/uploads/courses/${req.files.thumbnail[0].filename}`;
+                thumbnail_url = req.files.thumbnail[0].path; // full Cloudinary URL
             }
             if (req.files.methods_doc) {
-                methods_doc_url = `/uploads/courses/${req.files.methods_doc[0].filename}`;
+                methods_doc_url = req.files.methods_doc[0].path; // full Cloudinary URL
             }
         }
 
@@ -93,7 +91,7 @@ exports.updateCourse = async (req, res) => {
             return res.status(404).json({ message: "Course not found." });
         }
 
-        if (existing[0].guide_id !== userId && req.user.role !== 'admin') {
+        if (String(existing[0].guide_id) !== String(userId) && req.user.role !== 'admin') {
             return res.status(403).json({ message: "Forbidden. Not course owner." });
         }
 
@@ -102,33 +100,23 @@ exports.updateCourse = async (req, res) => {
 
         if (req.files) {
             if (req.files.thumbnail) {
-                thumbnail_url = `/uploads/courses/${req.files.thumbnail[0].filename}`;
-                // Delete old thumbnail
-                if (existing[0].thumbnail_url) {
-                    const oldPath = path.join(__dirname, '../../../', existing[0].thumbnail_url);
-                    if (fs.existsSync(oldPath)) fs.unlink(oldPath, (err) => { if (err) console.error("Failed to delete old thumbnail:", err); });
-                }
+                thumbnail_url = req.files.thumbnail[0].path; // Cloudinary URL
             }
             if (req.files.methods_doc) {
-                methods_doc_url = `/uploads/courses/${req.files.methods_doc[0].filename}`;
-                // Delete old doc
-                if (existing[0].methods_doc_url) {
-                    const oldPath = path.join(__dirname, '../../../', existing[0].methods_doc_url);
-                    if (fs.existsSync(oldPath)) fs.unlink(oldPath, (err) => { if (err) console.error("Failed to delete old methods_doc:", err); });
-                }
+                methods_doc_url = req.files.methods_doc[0].path; // Cloudinary URL
             }
         }
 
         await db.query(
             `UPDATE courses SET title = ?, description = ?, price = ?, level = ?, thumbnail_url = ?, methods_doc_url = ?, updated_at = NOW()
              WHERE id = ?`,
-            [title || existing[0].title, description || existing[0].description, price || existing[0].price, level || existing[0].level, thumbnail_url, methods_doc_url, id]
+            [title || existing[0].title, description || existing[0].description, price ?? existing[0].price, level || existing[0].level, thumbnail_url, methods_doc_url, id]
         );
 
         const [updated] = await db.query("SELECT * FROM courses WHERE id = ?", [id]);
         res.status(200).json({ message: "Course updated.", course: updated[0] });
     } catch (error) {
-        console.error("DEBUG: Update course error:", error);
+        console.error("Update course error:", error.message, error.code);
         res.status(500).json({ message: "Server error.", error: error.message });
     }
 };
@@ -278,5 +266,32 @@ exports.updateEnrollmentStatus = async (req, res) => {
     } catch (error) {
         console.error("Update enrollment status error:", error);
         res.status(500).json({ message: "Server error." });
+    }
+};
+
+// ─── DELETE /api/courses/:id — Delete course (Guide owner / Admin) ─────────────
+exports.deleteCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        const [existing] = await db.query("SELECT * FROM courses WHERE id = ?", [id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ message: "Course not found." });
+        }
+
+        if (String(existing[0].guide_id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Forbidden. Not course owner." });
+        }
+
+        // Null out orders referencing this course (belt-and-suspenders for FK)
+        await db.query("UPDATE orders SET course_id = NULL WHERE course_id = ?", [id]);
+        // course_enrollments cascade automatically
+        await db.query("DELETE FROM courses WHERE id = ?", [id]);
+
+        res.status(200).json({ message: "Course deleted successfully." });
+    } catch (error) {
+        console.error("Delete course error:", error.message, error.code);
+        res.status(500).json({ message: "Server error.", error: error.message });
     }
 };

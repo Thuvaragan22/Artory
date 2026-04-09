@@ -238,8 +238,11 @@ exports.googleCallback = (req, res) => {
 // ─── GET CURRENT USER (me) ────────────────────────────────────────────────────
 exports.getMe = async (req, res) => {
   try {
+    // Base columns — always exist
     const [users] = await db.query(
-      "SELECT id, username, email, role, profile_image_url, is_verified, created_at FROM users WHERE id = ?",
+      `SELECT id, username, email, role, profile_image_url, is_verified, created_at,
+              subscription_plan_id
+       FROM users WHERE id = ?`,
       [req.user.id]
     );
 
@@ -247,7 +250,23 @@ exports.getMe = async (req, res) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    res.status(200).json({ user: users[0] });
+    const user = users[0];
+
+    // Migration columns — only exist after migrate_subscription.js is run
+    try {
+      const [extra] = await db.query(
+        `SELECT plan_type, subscription_status FROM users WHERE id = ?`,
+        [req.user.id]
+      );
+      user.plan_type = extra[0]?.plan_type || 'free';
+      user.subscription_status = extra[0]?.subscription_status || 'inactive';
+    } catch (_) {
+      // Columns not yet added — migration pending
+      user.plan_type = 'free';
+      user.subscription_status = 'inactive';
+    }
+
+    res.status(200).json({ user });
   } catch (error) {
     console.error("Get me error:", error);
     res.status(500).json({ message: "Server error." });

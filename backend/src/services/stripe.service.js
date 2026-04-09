@@ -48,4 +48,37 @@ exports.createCheckoutSession = async ({ id, name, description, amount, type }, 
     }
 };
 
+/**
+ * Create a Stripe Subscription Checkout Session
+ * @param {string} priceId - Stripe Price ID for the subscription
+ * @param {string} customerEmail - Email of the customer
+ * @param {string} successUrl - URL to redirect on success
+ * @param {string} cancelUrl - URL to redirect on cancel
+ * @param {Object} metadata - Metadata to include in the session
+ * @returns {Promise<Object>} - Stripe session object
+ */
+exports.createSubscriptionSession = async (priceId, customerEmail, successUrl, cancelUrl, metadata = {}) => {
+    try {
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                },
+            ],
+            mode: 'subscription',
+            customer_email: customerEmail,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            metadata: metadata
+        });
+
+        return session;
+    } catch (error) {
+        console.error('Stripe subscription session error:', error);
+        throw error;
+    }
+};
+
 exports.stripe = stripe;

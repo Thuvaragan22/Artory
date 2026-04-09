@@ -15,7 +15,8 @@ exports.toggleLike = async (req, res) => {
         if (existing.length > 0) {
             // Unlike
             await db.query("DELETE FROM likes WHERE id = ?", [existing[0].id]);
-            return res.status(200).json({ message: "Artwork unliked.", liked: false });
+            const [count] = await db.query("SELECT COUNT(*) as total FROM likes WHERE artwork_id = ?", [artworkId]);
+            return res.status(200).json({ message: "Artwork unliked.", liked: false, count: count[0].total });
         } else {
             // Like
             await db.query(
@@ -25,14 +26,15 @@ exports.toggleLike = async (req, res) => {
 
             // Optional: Create notification for artwork owner
             const [art] = await db.query("SELECT guide_id, title FROM artworks WHERE id = ?", [artworkId]);
-            if (art.length > 0 && art[0].guide_id !== userId) {
+            if (art.length > 0 && String(art[0].guide_id) !== String(userId)) {
                 await db.query(
                     "INSERT INTO notifications (user_id, type, message, link) VALUES (?, 'like', ?, ?)",
                     [art[0].guide_id, `Someone liked your artwork "${art[0].title}"`, `/artworks/${artworkId}`]
                 );
             }
 
-            return res.status(201).json({ message: "Artwork liked!", liked: true });
+            const [count] = await db.query("SELECT COUNT(*) as total FROM likes WHERE artwork_id = ?", [artworkId]);
+            return res.status(201).json({ message: "Artwork liked!", liked: true, count: count[0].total });
         }
     } catch (error) {
         console.error("Toggle like error:", error);
@@ -40,7 +42,27 @@ exports.toggleLike = async (req, res) => {
     }
 };
 
-// ─── POST /api/social/comment/:artworkId — Add Comment ───────────────────────
+// ─── GET /api/social/like/:artworkId — Check if liked ────────────────────────
+exports.getLikeStatus = async (req, res) => {
+    try {
+        const { artworkId } = req.params;
+        const userId = req.user.id;
+
+        const [existing] = await db.query(
+            "SELECT id FROM likes WHERE user_id = ? AND artwork_id = ?",
+            [userId, artworkId]
+        );
+        const [count] = await db.query(
+            "SELECT COUNT(*) as total FROM likes WHERE artwork_id = ?",
+            [artworkId]
+        );
+
+        res.status(200).json({ liked: existing.length > 0, count: count[0].total });
+    } catch (error) {
+        console.error("Get like status error:", error);
+        res.status(500).json({ message: "Server error." });
+    }
+};
 exports.addComment = async (req, res) => {
     try {
         const { artworkId } = req.params;

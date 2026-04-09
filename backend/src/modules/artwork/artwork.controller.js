@@ -8,17 +8,15 @@ exports.createArtwork = async (req, res) => {
     const { title, description, category, is_for_sale, price } = req.body;
     const guideId = req.user.id;
 
-    // Accept a real uploaded file OR a URL passed in the body (backward compat)
     let image_url = req.body.image_url || null;
     if (req.file) {
-      image_url = `/uploads/artworks/${req.file.filename}`;
+      image_url = req.file.path; // full Cloudinary URL
     }
 
     if (!title || !image_url) {
       return res.status(400).json({ message: "Title and an image file are required." });
     }
 
-    console.log("Creating artwork with body:", req.body);
     const isForSaleBool = is_for_sale === 'true' || is_for_sale === true;
     const priceNum = parseFloat(price) || 0;
 
@@ -32,8 +30,8 @@ exports.createArtwork = async (req, res) => {
 
     res.status(201).json({ message: "Artwork created.", artwork: artwork[0] });
   } catch (error) {
-    console.error("Create artwork error:", error);
-    res.status(500).json({ message: "Server error." });
+    console.error("Create artwork error:", error.message, error.code);
+    res.status(500).json({ message: "Server error.", error: error.message });
   }
 };
 
@@ -101,17 +99,7 @@ exports.updateArtwork = async (req, res) => {
     // Handle file upload if present
     let updated_image_url = image_url;
     if (req.file) {
-      updated_image_url = `/uploads/artworks/${req.file.filename}`;
-
-      // Delete old file if it exists and is different
-      if (existing[0].image_url && existing[0].image_url !== updated_image_url) {
-        const oldPath = path.join(__dirname, "../../../", existing[0].image_url);
-        if (fs.existsSync(oldPath)) {
-          fs.unlink(oldPath, (err) => {
-            if (err) console.error("Failed to delete old artwork image:", err);
-          });
-        }
-      }
+      updated_image_url = req.file.path; // full Cloudinary URL
     }
 
     const fields = [];
@@ -122,7 +110,6 @@ exports.updateArtwork = async (req, res) => {
     if (updated_image_url) { fields.push("image_url = ?"); values.push(updated_image_url); }
     if (category) {
       fields.push("category = ?"); values.push(category);
-      fields.push("medium = ?"); values.push(category);
     }
 
 
@@ -168,15 +155,18 @@ exports.deleteArtwork = async (req, res) => {
       return res.status(404).json({ message: "Artwork not found." });
     }
 
-    // Guide can only delete their own; admin can delete any
-    if (userRole !== "admin" && existing[0].guide_id !== userId) {
+    if (userRole !== "admin" && String(existing[0].guide_id) !== String(userId)) {
       return res.status(403).json({ message: "Not owner. Cannot delete this artwork." });
     }
 
+    // Null out orders referencing this artwork (belt-and-suspenders for FK)
+    await db.query("UPDATE orders SET artwork_id = NULL WHERE artwork_id = ?", [id]);
+    // likes and comments cascade automatically
     await db.query("DELETE FROM artworks WHERE id = ?", [id]);
-    res.status(200).json({ message: "Artwork deleted." });
+
+    res.status(200).json({ message: "Artwork deleted successfully." });
   } catch (error) {
-    console.error("Delete artwork error:", error);
-    res.status(500).json({ message: "Server error." });
+    console.error("Delete artwork error:", error.message, error.code);
+    res.status(500).json({ message: "Server error.", error: error.message });
   }
 };

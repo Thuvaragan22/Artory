@@ -8,10 +8,10 @@ exports.createPractice = async (req, res) => {
     const { title, description } = req.body;
     const learnerId = req.user.id;
 
-    // Accept a real uploaded file OR a URL passed in the body (backward compat)
+    // Cloudinary returns full URL in req.file.path
     let image_url = req.body.image_url || null;
     if (req.file) {
-      image_url = `/uploads/practice/${req.file.filename}`;
+      image_url = req.file.path; // full Cloudinary URL
     }
 
     if (!title || !image_url) {
@@ -43,10 +43,6 @@ exports.getMyPractice = async (req, res) => {
       `SELECT * FROM practice_works WHERE learner_id = ? ORDER BY created_at DESC`,
       [learnerId]
     );
-
-    if (practices.length === 0) {
-      return res.status(404).json({ message: "No data found." });
-    }
 
     res.status(200).json({ message: "Practice list.", total: practices.length, practices });
   } catch (error) {
@@ -82,7 +78,6 @@ exports.getPracticeById = async (req, res) => {
 };
 
 // ─── DELETE /api/practice/:id — Delete practice (Learner/Owner only) ──────────
-
 exports.deletePractice = async (req, res) => {
   try {
     const { id } = req.params;
@@ -97,15 +92,15 @@ exports.deletePractice = async (req, res) => {
       return res.status(404).json({ message: "Practice not found." });
     }
 
-    if (existing[0].learner_id !== learnerId) {
+    if (String(existing[0].learner_id) !== String(learnerId)) {
       return res.status(403).json({ message: "Not owner. Cannot delete this practice." });
     }
 
     await db.query("DELETE FROM practice_works WHERE id = ?", [id]);
-    res.status(200).json({ message: "Practice deleted." });
+    res.status(200).json({ message: "Practice work deleted successfully." });
   } catch (error) {
     console.error("Delete practice error:", error);
-    res.status(500).json({ message: "Server error." });
+    res.status(500).json({ message: "Server error.", error: error.message });
   }
 };
 
@@ -130,17 +125,7 @@ exports.updatePractice = async (req, res) => {
     // Handle file upload if present
     let updated_image_url = image_url;
     if (req.file) {
-      updated_image_url = `/uploads/practice/${req.file.filename}`;
-
-      // Delete old file
-      if (existing[0].image_url && existing[0].image_url !== updated_image_url) {
-        const oldPath = path.join(__dirname, "../../../", existing[0].image_url);
-        if (fs.existsSync(oldPath)) {
-          fs.unlink(oldPath, (err) => {
-            if (err) console.error("Failed to delete old practice image:", err);
-          });
-        }
-      }
+      updated_image_url = req.file.path; // full Cloudinary URL
     }
 
     const fields = [];

@@ -8,6 +8,7 @@ router.get("/comments/:artworkId", socialController.getComments);
 
 // Private
 router.use(verifyToken);
+router.get("/like-status/:artworkId", socialController.getLikeStatus);
 router.post("/like/:artworkId", socialController.toggleLike);
 router.post("/comment/:artworkId", socialController.addComment);
 

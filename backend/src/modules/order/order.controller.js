@@ -106,6 +106,55 @@ exports.getMyOrders = async (req, res) => {
 };
 
 /**
+ * @desc    Complete an artwork order on checkout success (called by frontend)
+ * @route   POST /api/orders/:id/complete
+ * @access  Private (Learner/Guide)
+ */
+exports.completeOrder = async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    try {
+        // Verify this order belongs to the requesting user
+        const [orders] = await db.query(
+            "SELECT * FROM orders WHERE id = ? AND learner_id = ? LIMIT 1",
+            [id, userId]
+        );
+
+        if (orders.length === 0) {
+            return res.status(404).json({ message: "Order not found." });
+        }
+
+        const order = orders[0];
+
+        // Already completed — idempotent, just return success
+        if (order.status === 'completed') {
+            return res.json({ message: "Order already completed.", order });
+        }
+
+        // Mark order as completed
+        await db.query(
+            "UPDATE orders SET status = 'completed', updated_at = NOW() WHERE id = ?",
+            [id]
+        );
+
+        // If this was an artwork order — mark it as sold and remove from gallery
+        if (order.artwork_id) {
+            await db.query(
+                "UPDATE artworks SET is_sold = 1, is_for_sale = 0, updated_at = NOW() WHERE id = ?",
+                [order.artwork_id]
+            );
+            console.log(`🎨 Artwork ${order.artwork_id} marked as sold via order ${id}`);
+        }
+
+        res.json({ message: "Order completed.", artworkId: order.artwork_id || null });
+    } catch (error) {
+        console.error("Complete order error:", error);
+        res.status(500).json({ message: "Failed to complete order.", error: error.message });
+    }
+};
+
+/**
  * @desc    Update order status
  * @route   PATCH /api/orders/:id
  * @access  Private (Admin)

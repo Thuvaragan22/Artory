@@ -11,6 +11,7 @@ router.use(verifyToken);
 // Learner + Guide can create orders (buy artworks/courses)
 router.post("/", authorizeRoles("learner", "guide"), orderController.createOrder);
 router.get("/me", authorizeRoles("learner", "guide"), orderController.getMyOrders);
+router.post("/:id/complete", authorizeRoles("learner", "guide"), orderController.completeOrder);
 router.post("/payments", authorizeRoles("learner", "guide"), paymentController.createPayment);
 
 // Admin routes

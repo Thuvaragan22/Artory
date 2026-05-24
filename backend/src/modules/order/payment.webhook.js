@@ -38,9 +38,11 @@ exports.handleWebhook = async (req, res) => {
                 // ── Artwork purchase ──────────────────────────────────────────
                 if (type === "artwork") {
                     const orderId = meta.orderId;
+                    const artworkId = meta.artworkId;
                     const amount = (session.amount_total || 0) / 100;
                     const txId = session.payment_intent;
 
+                    // Complete the order
                     await db.query(
                         "UPDATE orders SET status = 'completed', updated_at = NOW() WHERE id = ?",
                         [orderId]
@@ -50,6 +52,16 @@ exports.handleWebhook = async (req, res) => {
                          VALUES (?, ?, 'card', 'success', ?, NOW())`,
                         [orderId, amount, txId]
                     );
+
+                    // Mark artwork as sold — remove from gallery and disable purchasing
+                    if (artworkId) {
+                        await db.query(
+                            "UPDATE artworks SET is_sold = 1, is_for_sale = 0, updated_at = NOW() WHERE id = ?",
+                            [artworkId]
+                        );
+                        console.log(`🎨 Artwork ${artworkId} marked as sold`);
+                    }
+
                     console.log(`✅ Artwork order ${orderId} completed`);
                 }
 

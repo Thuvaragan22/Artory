@@ -31,6 +31,12 @@ const app = express();
             await db.query('ALTER TABLE users ADD COLUMN is_grandfathered TINYINT(1) NOT NULL DEFAULT 0');
         }
 
+        // Add is_sold column to artworks
+        const [scols] = await db.query('SHOW COLUMNS FROM artworks LIKE "is_sold"');
+        if (scols.length === 0) {
+            await db.query('ALTER TABLE artworks ADD COLUMN is_sold TINYINT(1) NOT NULL DEFAULT 0');
+        }
+
         console.log("✅ Subscription columns ready");
     } catch (e) {
         console.log("⚠️  Migration skipped:", e.message);

@@ -44,6 +44,7 @@ exports.getAllArtworks = async (req, res) => {
               (SELECT COUNT(*) FROM likes WHERE artwork_id = a.id) as likes_count
        FROM artworks a
        JOIN users u ON u.id = a.guide_id
+       WHERE a.is_sold = 0
        ORDER BY a.created_at DESC`
     );
     res.status(200).json({ message: "List of artworks.", total: artworks.length, artworks });
